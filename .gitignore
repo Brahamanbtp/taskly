@@ -1,0 +1,89 @@
+# ============================
+# Taskly — Full Stack App
+# ============================
+
+###############
+# Node Modules
+###############
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+###############
+# Environment Files
+###############
+.env
+*.env
+backend/.env
+frontend/.env
+
+# Example env files are allowed
+!backend/.env.example
+!frontend/.env.example
+
+###############
+# SQLite Database Files
+###############
+backend/data.sqlite
+backend/data.sqlite-journal
+backend/*.db
+backend/*.db-journal
+
+###############
+# Build Output
+###############
+# Frontend build (Vite)
+frontend/dist/
+
+# Backend build folders (if any)
+backend/build/
+
+###############
+# Logs
+###############
+*.log
+npm-debug.log*
+backend/server.log
+
+###############
+# OS Files
+###############
+.DS_Store
+Thumbs.db
+
+###############
+# Editor / IDE files
+###############
+.vscode/*
+!.vscode/settings.json    # Keep generic workspace settings if needed
+.idea/
+
+###############
+# Docker / Runtime
+###############
+*.pid
+*.tmp
+docker-data/
+docker-compose.override.yml
+
+###############
+# Test Coverage
+###############
+coverage/
+*.lcov
+
+###############
+# Misc
+###############
+.env.test
+.env.local
+.env.production
+.env.development
+
+# Parcel / Vite caches
+.cache/
+.esbuild/
+
+# Yarn / pnpm
+.pnp.*
+.yarn/*
