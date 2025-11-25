@@ -1,19 +1,18 @@
+// frontend/src/App.jsx
 import React, { useState, useEffect } from 'react';
-const API = import.meta.env.VITE_API_BASE || 'http://localhost:4000/api';
+import {
+  signUp,
+  signIn,
+  signOut,
+  getCurrentUser,
+  createTask as apiCreateTask,
+  listTasks as apiListTasks,
+  updateTaskStatus as apiUpdateTaskStatus,
+  editTaskTitle as apiEditTaskTitle,
+  deleteTask as apiDeleteTask
+} from './api';
 
-function tokenFromStorage() {
-  return localStorage.getItem('token');
-}
-function setToken(t, email = null) {
-  if (t) {
-    localStorage.setItem('token', t);
-    if (email) localStorage.setItem('email', email);
-  } else {
-    localStorage.removeItem('token');
-    localStorage.removeItem('email');
-  }
-}
-
+/* ---------- UI helpers (kept from original app) ---------- */
 function IconLogo(){
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -24,33 +23,56 @@ function IconLogo(){
     </svg>
   );
 }
+function Avatar({name}){
+  const initials = (name || 'U').split('@')[0].slice(0,2).toUpperCase();
+  return <div className="avatar">{initials}</div>
+}
 
+/* ------------------ Auth Form ------------------ */
 function Auth({ onLogin }) {
   const [mode, setMode] = useState('login'); // login | signup
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
-  async function submit(e) {
+    async function submit(e) {
     e.preventDefault();
     setBusy(true);
     try {
-      const res = await fetch(`${API}/${mode}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setToken(data.token, data.user.email);
-        onLogin();
+      if (mode === 'login') {
+        const { data, error } = await signIn(email, password);
+        if (error) {
+          alert(error.message || error);
+        } else {
+          onLogin();
+        }
       } else {
-        alert(data.error || 'Error');
+        // signup
+        const { data, error } = await signUp(email, password);
+        if (error) {
+          alert(error.message || error);
+        } else {
+          // Some Supabase setups require email confirmation and do not create a session.
+          // Try to sign in immediately to get a session (if allowed).
+          const { data: signinData, error: signinError } = await signIn(email, password);
+          if (signinError) {
+            // still proceed — user may need to confirm email
+            alert('Signed up. Please check your email to confirm login (if required).');
+            onLogin(); // optional: treat as logged-in if your policy allows preview
+          } else {
+            onLogin();
+          }
+        }
       }
-    } catch(err){
+    } catch (err) {
+      console.error(err);
       alert('Network error');
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
+
+
   return (
     <div className="auth-wrap">
       <div style={{display:'flex',alignItems:'center',gap:12, marginBottom:6}}>
@@ -59,7 +81,7 @@ function Auth({ onLogin }) {
             <IconLogo />
           </div>
           <div>
-            <div style={{fontWeight:700}}>Tasks App</div>
+            <div style={{fontWeight:700}}>Taskly</div>
             <div style={{fontSize:13,color:'#94a3b8'}}>Simple tasks, smarter life</div>
           </div>
         </div>
@@ -82,64 +104,74 @@ function Auth({ onLogin }) {
   );
 }
 
-function Avatar({name}){
-  const initials = (name || 'U').split('@')[0].slice(0,2).toUpperCase();
-  return <div className="avatar">{initials}</div>
-}
-
+/* ------------------ Tasks App ------------------ */
 function Tasks({ onLogout }) {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
-  const token = tokenFromStorage();
-  const email = localStorage.getItem('email') || 'you@domain';
+  const [userEmail, setUserEmail] = useState('you@domain');
+
+  async function loadUser() {
+    const userRes = await getCurrentUser();
+    if (userRes) {
+      setUserEmail(userRes.email || 'you@domain');
+    }
+  }
 
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/tasks`, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (res.ok) setTasks(data.tasks || []);
-      else alert(data.error || 'Failed to fetch');
+      const { data, error } = await apiListTasks();
+      if (error) {
+        console.error(error);
+        alert(error.message || 'Failed to fetch tasks');
+      } else {
+        setTasks(data || []);
+      }
     } catch(e){
+      console.error(e);
       alert('Network error');
     } finally { setLoading(false); }
   }
-  useEffect(()=> { load(); }, []);
+
+  useEffect(()=> {
+    loadUser();
+    load();
+    // optional: subscribe to auth changes to refresh user & tasks when login/out
+    // We keep it simple for demo
+  }, []);
 
   async function createTask(e) {
     e.preventDefault();
     if (!title) return;
     setAdding(true);
     try {
-      const res = await fetch(`${API}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ title })
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const { data, error } = await apiCreateTask(title);
+      if (error) {
+        console.error(error);
+        alert(error.message || 'error');
+      } else {
         setTitle('');
         await load();
-      } else alert(data.error || 'error');
+      }
     } catch(err){
+      console.error(err);
       alert('Network error');
     } finally { setAdding(false); }
   }
 
   async function updateStatus(id, status) {
     try {
-      const res = await fetch(`${API}/tasks/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status })
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const { data, error } = await apiUpdateTaskStatus(id, status);
+      if (error) {
+        console.error(error);
+        alert(error.message || 'err');
+      } else {
         await load();
-      } else alert(data.error || 'err');
+      }
     } catch(err){
+      console.error(err);
       alert('Network error');
     }
   }
@@ -161,11 +193,11 @@ function Tasks({ onLogout }) {
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <div style={{textAlign:'right',marginRight:8}}>
-            <div style={{fontWeight:700}}>{email}</div>
+            <div style={{fontWeight:700}}>{userEmail}</div>
             <div style={{fontSize:12,color:'#94a3b8'}}>Personal workspace</div>
           </div>
           <div>
-            <button className="btn secondary" onClick={() => { setToken(null); onLogout(); }}>Logout</button>
+            <button className="btn secondary" onClick={async () => { await signOut(); onLogout(); }}>Logout</button>
           </div>
         </div>
       </div>
@@ -173,9 +205,9 @@ function Tasks({ onLogout }) {
       <div className="grid" style={{alignItems:'start'}}>
         <div className="card user-card">
           <div style={{display:'flex',gap:12,alignItems:'center'}}>
-            <Avatar name={email} />
+            <Avatar name={userEmail} />
             <div>
-              <div style={{fontWeight:800}}>{email}</div>
+              <div style={{fontWeight:800}}>{userEmail}</div>
               <div style={{color:'#94a3b8',fontSize:13}}>Member since demo</div>
             </div>
           </div>
@@ -277,8 +309,18 @@ function Tasks({ onLogout }) {
   );
 }
 
+/* ------------------ Root App ------------------ */
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(!!tokenFromStorage());
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  // On mount, check if there is a logged-in user
+  useEffect(() => {
+    (async () => {
+      const user = await getCurrentUser();
+      if (user) setLoggedIn(true);
+    })();
+    // optional: subscribe to auth state changes if you want realtime updates
+  }, []);
 
   return (
     <div>
