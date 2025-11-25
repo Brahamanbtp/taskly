@@ -1,0 +1,72 @@
+name: CI - backend smoke
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install backend deps
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Create .env for CI
+        run: |
+          cat > ./backend/.env <<EOF
+          JWT_SECRET=testsecretforci
+          PORT=4000
+          HOST=127.0.0.1
+          DB_PATH=./data.sqlite
+          EOF
+
+      - name: Start backend (background)
+        working-directory: ./backend
+        run: |
+          node server.js > server.log 2>&1 &
+          # wait for server to come up
+          for i in {1..15}; do
+            if curl -sS http://127.0.0.1:4000/healthz >/dev/null 2>&1; then
+              echo "server is up"
+              break
+            fi
+            echo "waiting..."
+            sleep 1
+          done
+        timeout-minutes: 2
+
+      - name: Smoke test - signup & login
+        working-directory: ./backend
+        run: |
+          set -e
+          # signup
+          curl -s -X POST http://127.0.0.1:4000/api/signup -H "Content-Type: application/json" -d '{"email":"ci_user@example.com","password":"abc123"}' -o signup.json
+          cat signup.json
+          # login
+          curl -s -X POST http://127.0.0.1:4000/api/login -H "Content-Type: application/json" -d '{"email":"ci_user@example.com","password":"abc123"}' -o login.json
+          cat login.json
+          TOKEN=$(jq -r '.token' login.json)
+          if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
+            echo "Login failed"
+            exit 1
+          fi
+          # create a task
+          curl -s -X POST http://127.0.0.1:4000/api/tasks -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"title":"ci task"}' -o task.json
+          cat task.json
+
+      - name: Upload server logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-log
+          path: backend/server.log
