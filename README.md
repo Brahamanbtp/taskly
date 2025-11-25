@@ -1,274 +1,294 @@
-\documentclass{article}
-\usepackage[utf8]{inputenc}
-\usepackage{hyperref}
-\usepackage{enumitem}
-\usepackage{graphicx}
-\usepackage{xcolor}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{fontawesome5}
-\usepackage{booktabs}
-\usepackage{multirow}
-\usepackage{colortbl}
-\usepackage{listings}
-\usepackage{inconsolata}
+# Taskly — Simple Tasks App (Frontend + Supabase Backend)
 
-\definecolor{codegreen}{rgb}{0,0.6,0}
-\definecolor{codegray}{rgb}{0.5,0.5,0.5}
-\definecolor{codepurple}{rgb}{0.58,0,0.82}
-\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+Taskly is a minimal full-stack task manager with user authentication, personal task lists, task status updates, summary counters, and basic logging.  
+The backend is powered by Supabase (Postgres + Auth) and the frontend is a Vite + React SPA deployed on Vercel.
 
-\lstdefinestyle{mystyle}{
-    backgroundcolor=\color{backcolour},
-    commentstyle=\color{codegreen},
-    keywordstyle=\color{magenta},
-    numberstyle=\tiny\color{codegray},
-    stringstyle=\color{codepurple},
-    basicstyle=\ttfamily\footnotesize,
-    breakatwhitespace=false,
-    breaklines=true,
-    captionpos=b,
-    keepspaces=true,
-    numbers=left,
-    numbersep=5pt,
-    showspaces=false,
-    showstringspaces=false,
-    showtabs=false,
-    tabsize=2
-}
+## 🚀 A. How to Run (Local + Production)
+### 1. Clone the repo
+```bash
+git clone https://github.com/Brahamanbtp/taskly.git
+cd taskly
+```
 
-\lstset{style=mystyle}
+## Backend (Supabase)
 
-\title{\faThumbtack ~ Taskly — Minimal Full-Stack Tasks App}
-\author{}
-\date{}
+Taskly uses Supabase as the backend:
 
-\begin{document}
+- Postgres database
 
-\maketitle
+- Supabase Auth (email/password)
 
-\section*{Overview}
-A clean, simple task manager built with \textbf{React + Express + SQLite + JWT}. Taskly implements signup/login, per-user tasks, status updates, summary counters, server-side caching, and persisted API logs. The goal was to build a clear, small, and understandable full-stack app within a short timebox, following the assignment requirements.
+- RLS Policies for row-level isolation (each user sees only their tasks)
 
-\section*{🚀 How to Run Taskly}
+- Supabase JS client on frontend
 
-\subsection*{1. Backend}
-\begin{lstlisting}[language=bash]
-cd backend
-cp .env.example .env
-# Edit .env and set a strong JWT_SECRET
-npm install
-npm run dev        # or: node server.js
-\end{lstlisting}
-\textbf{Backend runs at:} \faArrowRight ~ \href{http://localhost:4000}{http://localhost:4000} (or Codespaces forwarded port)
+#### Setup Steps
 
-\subsection*{Environment Variables (backend/.env)}
-\begin{tabular}{@{}ll@{}}
-    \toprule
-    \textbf{Key} & \textbf{Meaning} \\
-    \midrule
-    JWT\_SECRET & Secret used to sign JWTs \\
-    PORT & Default 4000 \\
-    HOST & Default 0.0.0.0 (Codespaces/Docker friendly) \\
-    DB\_PATH & Path to SQLite DB file \\
-    \bottomrule
-\end{tabular}
+1. Create a Supabase project — https://supabase.com
 
-\subsection*{2. Frontend}
-\begin{lstlisting}[language=bash]
+2. Go to SQL Editor → run the tables and policies:
+
+#### Tables
+```bash
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'TODO',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS logs (
+  id BIGSERIAL PRIMARY KEY,
+  method TEXT,
+  path TEXT,
+  user_id UUID,
+  body JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+```
+
+#### Foreign Key → Supabase Auth
+```bash
+ALTER TABLE tasks
+  DROP CONSTRAINT IF EXISTS tasks_user_id_fkey;
+
+ALTER TABLE tasks
+  ADD CONSTRAINT tasks_user_id_fkey
+  FOREIGN KEY (user_id)
+  REFERENCES auth.users (id)
+  ON DELETE CASCADE;
+```
+
+#### RLS Policies
+```bash
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Insert own tasks" ON tasks
+  FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Select own tasks" ON tasks
+  FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Update own tasks" ON tasks
+  FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Delete own tasks" ON tasks
+  FOR DELETE
+  USING (auth.uid() = user_id);
+```
+
+## Frontend (React + Vite)
+### 2. Create frontend `.env`
+
+Inside `/frontend`, create:
+```bash
+VITE_SUPABASE_URL=https://<your-project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<your-anon-public-key>
+```
+
+### 3. Install deps + run
+```bash
 cd frontend
 npm install
 npm run dev
-\end{lstlisting}
-\textbf{Frontend runs at:} \faArrowRight ~ \href{http://localhost:3000}{http://localhost:3000} (or Codespaces preview URL)
+```
 
-If frontend cannot reach backend, set:
-\begin{lstlisting}[language=bash]
-VITE_API_BASE=<your-codespace-backend-url>/api
-\end{lstlisting}
-in a \texttt{.env} inside \texttt{frontend/}.
+---
 
-\subsection*{3. Run Entire App via Docker (Recommended for Reviewers)}
-\begin{lstlisting}[language=bash]
-docker compose up --build
-\end{lstlisting}
-\textbf{Backend} \faArrowRight ~ \href{http://localhost:4000}{http://localhost:4000} \\
-\textbf{Frontend} \faArrowRight ~ \href{http://localhost:3000}{http://localhost:3000}
+Then open:
+➡ http://localhost:5173
 
-\section*{📦 What Is Done / Not Done}
+### Production Deployment (Vercel)
 
-\subsection*{✅ Completed}
-\begin{itemize}
-    \item Email/password signup + login
-    \item JWT-based protected routes
-    \item Create task
-    \item List tasks
-    \item Update task status (TODO → IN\_PROGRESS → DONE)
-    \item Optional: Edit title, Delete task
-    \item Each user only sees their tasks
-    \item Summary counters (TODO / IN\_PROGRESS / DONE)
-    \item Server-side logging: Method, path, timestamp, user ID, request body
-    \item Server-side caching (30 seconds per user)
-    \item SQLite-powered backend (easy for reviewers)
-    \item Health \& metrics endpoints (\texttt{/healthz}, \texttt{/metrics})
-    \item Professional folder structure
-    \item \texttt{.env.example} and secure env loading
-    \item Dockerfile + docker-compose
-    \item GitHub Actions CI: Installs backend, starts server, signup → login → create task smoke test
-\end{itemize}
+1. Push repo to GitHub
 
-\subsection*{❌ Not Done (Timebox)}
-\begin{itemize}
-    \item No password reset / email verification
-    \item No role-based access for log viewing (demo-only)
-    \item No pagination or task search
-    \item No offline/local-first mode for frontend
-    \item No advanced caching like Redis (only in-memory)
-    \item No automated E2E tests for frontend yet
-\end{itemize}
+2. Import the frontend folder on Vercel
 
-\section*{🏗️ Architecture (In My Own Words)}
+3. Add env vars:
+   ```bash
+   VITE_SUPABASE_URL=...
+   VITE_SUPABASE_ANON_KEY=...
+   ```
 
-\subsection*{1. Authentication}
-Users sign up or log in using \texttt{/api/signup} or \texttt{/api/login}. On success, the server returns a JWT, which the frontend stores in \texttt{localStorage}. Every API request includes:
-\begin{lstlisting}[language=bash]
-Authorization: Bearer <token>
-\end{lstlisting}
-A small \texttt{authMiddleware} verifies the token and attaches \texttt{req.user}.
 
-\subsection*{2. Data Storage}
-Taskly uses SQLite for simplicity (file-based, portable).
+4. Deploy
 
-\begin{tabular}{@{}ll@{}}
-    \toprule
-    \textbf{Table} & \textbf{Columns} \\
-    \midrule
-    \texttt{users} & \texttt{id (uuid), email, password\_hash, created\_at} \\
-    \texttt{tasks} & \texttt{id, user\_id, title, status (TODO / IN\_PROGRESS / DONE), created\_at, updated\_at} \\
-    \texttt{logs} & Stores API logs for task-related actions \\
-    \bottomrule
-\end{tabular}
+    Vercel builds automatically.
 
-\subsection*{3. How Tasks Are Fetched}
-When a logged-in user loads their tasks:
-\begin{itemize}
-    \item Server checks in-memory cache for that user
-    \item If found and <30 seconds old → returns cached result
-    \item If not → fetches from DB, stores in cache, returns tasks
-    \item Cache is invalidated automatically when:
-    \begin{itemize}
-        \item Task is created
-        \item Task is updated
-        \item Task is deleted
-    \end{itemize}
-\end{itemize}
+---
 
-\subsection*{4. Logging}
-Every task-related API stores:
-\begin{itemize}
-    \item method
-    \item path
-    \item user\_id
-    \item body (JSON string)
-    \item timestamp
-\end{itemize}
-Logs go to the \texttt{logs} table, not just console.
+### 🎯 B. What is Done / Not Done
+#### ✅ Completed
 
-\section*{🔍 Short Reflections (Assignment Answers)}
+- Fully working signup/login using Supabase Auth
 
-\subsection*{1. Caching — How I implemented the 30-second cache}
-In \texttt{backend/server.js}, I use a simple \texttt{Map}:
-\begin{lstlisting}[language=javascript]
-cache.set(userId, { ts: Date.now(), tasks });
-\end{lstlisting}
-On every \texttt{GET /api/tasks}, I check if the cached entry is <30s old:
-\begin{itemize}
-    \item If yes → return cached result
-    \item If not → fetch from DB, overwrite cache
-\end{itemize}
-Cache is cleared for that user whenever tasks change. I also track \texttt{cacheHits} and \texttt{cacheMisses} at \texttt{/metrics}.
+- Secure row-level isolation: each user sees only their tasks
 
-\subsection*{2. Security — How I prevent cross-user access}
-\begin{itemize}
-    \item All protected routes use \texttt{authMiddleware} to decode the JWT
-    \item Database queries always use \texttt{WHERE user\_id = ?}
-    \item Task updates/delete check task ownership before modifying anything
-    \item Token must be included as \texttt{Authorization: Bearer <token>}
-\end{itemize}
+- Tasks CRUD:
 
-\subsection*{3. Bug I Faced + How I Solved It}
-At first, I forgot to invalidate the cache after updating a task. This made the UI show old data for up to 30 seconds. I debugged it by:
-\begin{itemize}
-    \item Printing cache state to console
-    \item Noticing cache hits even after updates
-    \item Adding \texttt{invalidateCache(userId)} in create/update/delete handlers
-\end{itemize}
+    - Create task
+ 
+    - List tasks
 
-\subsection*{4. If I Had 1 More Hour…}
-I would:
-\begin{itemize}
-    \item Add a tiny admin panel to view logs with filters
-    \item Add rate-limiting to prevent brute-force login
-    \item Deploy backend to Railway / Neon and frontend to Vercel
-    \item Add 1 end-to-end test with Playwright
-\end{itemize}
+    - Update task status (TODO → IN_PROGRESS → DONE)
 
-\section*{🎨 Screenshots}
-(Add screenshots after running the app)
-\begin{itemize}
-    \item Login Page
-    \item Tasks Dashboard
-\end{itemize}
+    - Edit/Delete (optional but implemented in code structure)
 
-\section*{📁 Project Structure}
-\dirtree{%
-.1 taskly/.
-.2 backend/.
-.3 server.js.
-.3 data.sqlite.
-.3 Dockerfile.
-.3 .env.example.
-.3 package.json.
-.2 frontend/.
-.3 src/.
-.3 Dockerfile.
-.3 package.json.
-.2 docker-compose.yml.
-.2 README.md.
-}
+- Summary counts (TODO / IN_PROGRESS / DONE)
 
-\section*{🧪 API Testing (Quick cURL Examples)}
+- UI with clean design
 
-\subsection*{Signup}
-\begin{lstlisting}[language=bash]
-curl -X POST http://localhost:4000/api/signup \
-  -H "Content-Type: application/json" \
-  -d '{"email": "demo@example.com", "password": "abc123"}'
-\end{lstlisting}
+- Server-side logging (insert logs into `logs` table / or console)
 
-\subsection*{Login}
-\begin{lstlisting}[language=bash]
-curl -X POST http://localhost:4000/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "demo@example.com", "password": "abc123"}'
-\end{lstlisting}
+- Frontend caching (Supabase client’s built-in cache + UI-level caching)
 
-\subsection*{Fetch Tasks}
-\begin{lstlisting}[language=bash]
-curl -X GET http://localhost:4000/api/tasks \
-  -H "Authorization: Bearer <TOKEN>"
-\end{lstlisting}
+- Deployment-ready frontend (Vercel)
 
-\section*{🎯 Final Notes}
-Taskly focuses on clarity, correctness, and completeness, matching all assignment goals:
-\begin{itemize}
-    \item Clean, readable backend
-    \item Minimal but fully working frontend
-    \item Server-side cache
-    \item Persisted logging
-    \item Per-user task security
-    \item Small, understandable codebase
-\end{itemize}
-This is intentionally simple but production-aware.
+- Deployment-ready backend (Supabase)
 
-\end{document}
+#### ❌ Not Done / Partially Done
+
+- Server-side 30-second DB caching (not needed with Supabase; but if required, can be emulated with Edge Functions)
+
+- No email-confirmation feature (disabled for demo)
+
+- No complex role-based authorization (only RLS)
+---
+
+### 🏗 C. Architecture in My Own Words
+
+Taskly is split into two parts:
+
+#### Authentication
+
+I use Supabase Auth.  
+When a user signs up or logs in, Supabase returns a session token stored automatically in the browser.   
+The frontend reads this token and automatically attaches it to all DB queries.
+
+#### Task Storage  
+Tasks are stored in a Postgres table `tasks` inside Supabase.   
+Each row has a `user_id` that references `auth.users(id)`.   
+RLS (Row-Level Security) ensures tasks are only visible to the correct user.
+
+#### Fetching Tasks
+
+The frontend uses the Supabase JS client:
+```bash
+supabase.from("tasks").select("*")
+```
+
+Supabase automatically enforces:    
+- authenticated user only
+
+- correct `user_id` via RLS
+
+- pagination, filtering
+
+#### Caching
+
+For caching:
+
+- the frontend temporarily stores tasks in component state
+
+- Supabase client also caches responses internally
+This avoids unnecessary re-fetching for fast UI.
+
+#### Logging
+
+Every task action calls:
+```bash
+INSERT INTO logs (...)
+```
+
+Or logs to the console.  
+I log:
+
+- Method
+
+- Path
+
+- Timestamp
+
+- User ID
+
+---
+
+### ✍️ D. Short Reflections
+
+#### 1. Caching
+
+Caching is done in two layers:
+
+- React state keeps the tasks list so re-renders don’t hit DB
+
+- Supabase client caches requests internally
+If I had time, I would add a Supabase Edge Function with a 30-second in-memory Map per user.
+
+#### 2. Security
+
+Supabase Row Level Security policies ensure:
+
+- `auth.uid()` must match `tasks.user_id`
+
+- Only the owner can read/write their tasks
+This is safer than manually checking tokens.
+
+#### 3. Bug Faced
+
+I initially got:
+❌ `"insert or update on tasks violates foreign key constrai0nt"`   
+Reason: tasks.user_id was referencing my own users table instead of `auth.users`.    
+Fix: Dropped old FK and added FK to `auth.users(id)`.
+
+#### 4. If I had 1 more hour
+
+I would add:
+
+- 30-second server cache via Edge Functions
+
+- Edit/Delete task UI
+
+- Activity timeline per user
+
+- Better email-based onboarding
+
+---
+
+### 📦 Folder Structure
+```bash
+taskly/
+│
+├── backend/
+│   ├── server.js
+│   ├── server-pg.js
+│   ├── migrate.js
+│   ├── db.sql
+│   ├── data.sqlite
+│   ├── Dockerfile
+│   ├── .env
+│   └── package.json
+│
+├── frontend/
+│   ├── src/
+│   ├── Dockerfile
+│   ├── .env
+│   └── package.json
+│
+├── docker-compose.yml
+└── README.md
+```
+---
+
+
+### 📄 License
+
+MIT (free to use)
+---
