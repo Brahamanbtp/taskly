@@ -155,7 +155,7 @@ function Tasks({ onLogout }) {
         <div className="brand">
           <div className="logo"><IconLogo /></div>
           <div>
-            <div className="title">Tasks</div>
+            <div className="title">Taskly</div>
             <div className="sub">Focus on what matters — tiny tasks, big wins.</div>
           </div>
         </div>
