@@ -84,6 +84,11 @@ coverage/
 .cache/
 .esbuild/
 
+# Scratch & Temporary
+scratch/
+backend/scratch/
+frontend/scratch/
+
 # Yarn / pnpm
 .pnp.*
 .yarn/*
