@@ -3,14 +3,10 @@ services:
   - type: web
     name: taskly-backend
     env: node
-    region: ohio # Common stable region
     plan: free
     buildCommand: npm install && cd backend && npm install
     startCommand: cd backend && node src/index.js
-    healthCheckPath: /healthz
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: DATABASE_URL
         fromDatabase:
           name: taskly-db
@@ -20,18 +16,14 @@ services:
           type: redis
           name: taskly-redis
           property: connectionString
-      - key: JWT_SECRET
-        generateValue: true
 
-# 2. Managed PostgreSQL
+  # 2. Redis Service
+  - type: redis
+    name: taskly-redis
+    plan: free
+    ipAllowList: [] # Required for internal-only access
+
+# 3. Database Instance
 databases:
   - name: taskly-db
-    region: ohio
     plan: free
-
-# 3. Managed Redis
-redis:
-  - name: taskly-redis
-    region: ohio
-    plan: free
-    ipAllowList: [] # Allows internal access only
