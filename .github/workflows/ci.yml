@@ -48,10 +48,9 @@ jobs:
           EOF
 
       - name: Initialize Database Schema
-        working-directory: ./backend
         run: |
-          # Use the schema.sql to set up the test DB
-          psql postgresql://postgres:password@localhost:5432/taskly_test -f schema.sql
+          # Use the schema.sql from the backend folder to set up the test DB
+          psql postgresql://postgres:password@localhost:5432/taskly_test -f backend/schema.sql
 
       - name: Start backend (background)
         working-directory: ./backend
