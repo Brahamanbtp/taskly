@@ -1,6 +1,6 @@
 import { getCachedTasks, setCachedTasks, updateCachedTask, deleteCachedTask, queueMutation } from './lib/offlineStore';
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 function getAuthHeaders() {
   const token = localStorage.getItem('taskly_token');
