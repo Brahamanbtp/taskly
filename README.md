@@ -2,6 +2,7 @@
 
 Taskly is a high-performance, enterprise-grade Kanban application designed for real-time collaboration, complex task management, and data-driven insights. Built with a modern full-stack architecture, it combines the responsiveness of a desktop app with the scalability of cloud-native services.
 
+
 ![Taskly Preview](https://via.placeholder.com/1200x600/111111/7c5cff?text=Taskly+Enterprise+Kanban)
 
 ## 💎 Premium Features
