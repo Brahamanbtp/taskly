@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getQueuedMutations, removeMutation } from '../lib/offlineStore';
 import { toast } from 'sonner';
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 function getAuthHeaders() {
   const token = localStorage.getItem('taskly_token');

@@ -345,7 +345,7 @@ function useOfflineInternal(queryClient) {
 
     setIsSyncing(true);
     let synced = 0;
-    const API_URL = 'http://localhost:4000/api';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
     const getAuthHeaders = () => {
       const token = localStorage.getItem('taskly_token');
       const workspaceId = localStorage.getItem('taskly_workspace_id');
