@@ -1,29 +1,32 @@
-// backend/migrate.js
 require('dotenv').config();
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error('DATABASE_URL not set in .env');
-  process.exit(1);
-}
-const pool = new Pool({ connectionString: DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-async function run() {
-  const sql = fs.readFileSync(path.join(__dirname, 'migrations', 'init.sql'), 'utf8');
+async function runMigration() {
   const client = await pool.connect();
   try {
-    console.log('Running migration...');
-    await client.query(sql);
-    console.log('Migration finished.');
+    console.log('🚀 Starting Database Schema Initialization...');
+    
+    const schemaPath = path.join(__dirname, 'schema.sql');
+    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+
+    await client.query('BEGIN');
+    await client.query(schemaSql);
+    await client.query('COMMIT');
+    console.log('✅ Database Schema Initialized Successfully!');
   } catch (err) {
-    console.error('Migration error', err);
+    await client.query('ROLLBACK');
+    console.error('❌ Migration failed:', err.message);
+    process.exit(1);
   } finally {
     client.release();
-    await pool.end();
+    pool.end();
   }
 }
 
-run();
+runMigration();

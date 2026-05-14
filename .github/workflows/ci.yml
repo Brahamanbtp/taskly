@@ -49,8 +49,14 @@ jobs:
 
       - name: Initialize Database Schema
         run: |
-          # Use the schema.sql from the backend folder to set up the test DB
-          psql postgresql://postgres:password@localhost:5432/taskly_test -f backend/schema.sql
+          SCHEMA_PATH=$(find . -name "schema.sql" | head -n 1)
+          if [ -z "$SCHEMA_PATH" ]; then
+            echo "❌ Error: schema.sql not found!"
+            ls -R
+            exit 1
+          fi
+          echo "✅ Found schema at: $SCHEMA_PATH"
+          psql postgresql://postgres:password@localhost:5432/taskly_test -f "$SCHEMA_PATH"
 
       - name: Start backend (background)
         working-directory: ./backend
