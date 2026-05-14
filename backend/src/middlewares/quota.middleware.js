@@ -1,11 +1,12 @@
 const { pool } = require('../db');
 const { PLANS } = require('../controllers/billing.controller');
 
+
 function checkQuota(resourceType) {
   return async (req, res, next) => {
     const workspaceId = req.workspace.id;
     const client = await pool.connect();
-    
+
     try {
       const wsRes = await client.query('SELECT plan FROM workspaces WHERE id = $1', [workspaceId]);
       const plan = wsRes.rows[0]?.plan || 'FREE';
